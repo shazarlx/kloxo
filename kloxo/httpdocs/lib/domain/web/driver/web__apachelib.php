@@ -932,6 +932,7 @@ function getSuexecString($username)
 
 static function staticgetSuexecString($username, $nname = null)
 {
+	$username = ($username) ? $username : 'apache'; //Temp fix for issue 863]
 	global $gbl, $sgbl, $login, $ghtml;
 
 	// issue #567 -- change '$this->main->username' to '$username' for consistence
