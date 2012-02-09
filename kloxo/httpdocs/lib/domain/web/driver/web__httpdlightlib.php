@@ -39,25 +39,23 @@ static function installMe()
 		system("cp /etc/init.d/httpd /etc/init.d/httpd-light");
 		system("sed -i 's/httpd        Startup/httpd-light  Startup/g' /etc/init.d/httpd-light");
 		system("sed -i 's/processname: httpd/processname: httpd-light/g' /etc/init.d/httpd-light");
-		system("sed -i 's,/etc/httpd/conf/httpd.conf,/etc/httpd-light/conf/httpd.conf,g' /etc/init.d/httpd-light");
 		system("sed -i 's,/etc/sysconfig/httpd,/etc/sysconfig/httpd-light,g' /etc/init.d/httpd-light");
 		system("sed -i 's,/var/run/httpd.pid,/var/run/httpd-light.pid,g' /etc/init.d/httpd-light");
 		system("sed -i 's,prog=httpd,prog=httpd-light,g' /etc/init.d/httpd-light");
 		system("sed -i 's,/var/lock/subsys/httpd,/var/lock/subsys/httpd-light,g' /etc/init.d/httpd-light");
-		system("sed -i '/INITLOG_ARGS=/ a\\\nOPTIONS=\"-f /etc/httpd-light/conf/httpd.conf\"' /etc/init.d/httpd-light");
-		#Create httpd-light configuration directory and configure httpd-light
-		system("cp -r /etc/httpd/ /etc/httpd-light");
-		system("sed -i 's,ServerRoot \"/etc/httpd\",ServerRoot \"/etc/httpd-light\",g' /etc/httpd-light/conf/httpd.conf");
-		system("sed -i 's,PidFile run/httpd.pid,PidFile run/httpd-light.pid,g' /etc/httpd-light/conf/httpd.conf");
-		#invalidate the worker config in the main httpd.conf for httpd-light
+		system("sed -i '/INITLOG_ARGS=/ a\\\nOPTIONS=\"-Dlight\"' /etc/init.d/httpd-light");
+		#Don't use PidFile from httpd.conf
+		system("sed -i 's,PidFile run/httpd.pid,#PidFile run/httpd.pid,g' /etc/httpd/conf/httpd.conf");
+		#invalidate the worker config in httpd.conf
 		system("sed -i 's/<IfModule worker.c>/<IfModule worker-old.c>/g' /etc/httpd-light/conf/httpd.conf");
 		#Create new file /etc/httpd-light/conf.d/reverseproxy.conf
 		system("echo LoadModule proxy_module modules/mod_proxy.so> /etc/httpd-light/conf.d/reverseproxy.conf");
 		system("echo ProxyPreserveHost on>> /etc/httpd-light/conf.d/reverseproxy.conf");
-		#No need for php on the httpd-light
-		system("rm -f /etc/httpd-light/conf.d/php.conf");
+		#Configure php not to load for httpd-light
+		system("sed -i 's,LoadModule php5_module modules/libphp5.so,<IfDefine light>\nLoadModule php5_module modules/libphp5.so\n</IfDefine>\n,g' /etc/httpd/conf.d/php.conf");
 		#Configure httpd-light for worker mpm
 		system("sed 's,#HTTPD=/usr/sbin/httpd.worker,HTTPD=/usr/sbin/httpd.worker,g' /etc/sysconfig/httpd > /etc/sysconfig/httpd-light");
+		#customize worker config for a server with 512 MB of memory
 		$str_createworkerconf = "echo \"<IfModule worker.c>\n";
 		$str_createworkerconf .= "\tThreadLimit       1024\n";
 		$str_createworkerconf .= "\tStartServers         2\n";
@@ -66,59 +64,69 @@ static function installMe()
 		$str_createworkerconf .= "\tMaxSpareThreads     75\n";
 		$str_createworkerconf .= "\tThreadsPerChild   1024\n";
 		$str_createworkerconf .= "\tMaxRequestsPerChild  0\n";
-		$str_createworkerconf .= "</IfModule>\"> /etc/httpd-light/conf.d/worker.conf";
+		$str_createworkerconf .= "</IfModule>\"> /etc/httpd/conf.d/worker.conf";
 		system($str_createworkerconf);
 		
-	#Configure httpd - Change this to separate file like for worker below
-	system("sed -i 's/Listen 80/Listen 127.0.0.1:8080/g' /etc/httpd/conf/httpd.conf");
-	system("sed -i 's/ServerLimit      256/ServerLimit       10/g' /etc/httpd/conf/httpd.conf");
-	system("sed -i 's/MaxClients       256/MaxClients        10/g' /etc/httpd/conf/httpd.conf");
+		#Configure PidFile
+		$str_createlightconf = "echo \"<IfDefine light>\n";
+		$str_createlightconf .= "\tPidFile run/httpd-light.pid\n";
+		$str_createlightconf .= "</IfDefine>\n";
+		$str_createlightconf .= "<IfDefine !light>\n";
+		$str_createlightconf .= "\tPidFile run/httpd.pid\n";
+		$str_createlightconf .= "</IfDefine>\n";
+		system($str_createlightconf);
 		
+	#invalidate the prefork config in the main httpd.conf file for httpd
+	system("sed -i 's/<IfModule prefork.c>/<IfModule prefork-old.c>/g' /etc/httpd-light/conf/httpd.conf");
+	#Configure prefork for a server with 512 MB of memory
+	$str_createpreforkconf = "echo \"<IfModule prefork.c>\n";
+	$str_createpreforkconf .= "\tStartServers         5\n";
+	$str_createpreforkconf .= "\tMinSpareServers      5\n";
+	$str_createpreforkconf .= "\tMaxSpareServers     10\n";
+	$str_createpreforkconf .= "\tServerLimit         10\n";
+	$str_createpreforkconf .= "\tMaxClients          10\n";
+	$str_createpreforkconf .= "\tMaxRequestsPerChild 4000\n";
+	$str_createpreforkconf .= "</IfModule>\"> /etc/httpd/conf.d/prefork.conf";
+	system($str_createpreforkconf);
+	
 	//Create directory structure for virtual hosts
-	#The foreach will make it easier to add additional httpd daemons in the future
 	lxfile_mkdir('/home/apache/conf');
-	foreach(array('httpd','httpd-light') as $a) {
-		lxfile_mkdir("/home/apache/conf/{$a}");
-		lxfile_mkdir("/home/apache/conf/{$a}/defaults");
-		lxfile_mkdir("/home/apache/conf/{$a}/domains");
-		lxfile_mkdir("/home/apache/conf/{$a}/redirects");
-		lxfile_mkdir("/home/apache/conf/{$a}/webmails");
-		lxfile_mkdir("/home/apache/conf/{$a}/wildcards");
-		lxfile_mkdir("/home/apache/conf/{$a}/exclusive");
-	}
+	lxfile_mkdir("/home/apache/conf/defaults");
+	lxfile_mkdir("/home/apache/conf/domains");
+	lxfile_mkdir("/home/apache/conf/redirects");
+	lxfile_mkdir("/home/apache/conf/webmails");
+	lxfile_mkdir("/home/apache/conf/wildcards");
+	lxfile_mkdir("/home/apache/conf/exclusive");
 
 	//Create the configuration for virtual hosts on httpd-light
-	foreach(array('httpd','httpd-light') as $a) {
-		$str_createincludeconf = "echo \"Include /home/apache/conf/{$a}/exclusive/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/defaults/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/domains/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/redirects/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/webmails/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/wildcards/*.conf\"> /etc/{$a}/conf.d/includes.conf";
+	$str_createincludeconf = "echo \"Include /home/apache/conf/exclusive/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/defaults/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/domains/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/redirects/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/webmails/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/conf.d/includes.conf";
 	
-		system($str_createincludeconf);
+	system($str_createincludeconf);
 
-		$init_file = "/home/apache/conf/{$a}/defaults/init.conf";
+	$init_file = "/home/apache/conf/defaults/init.conf";
 
-		//$vdomlist = $this->main->__var_vdomain_list; 
+	//$vdomlist = $this->main->__var_vdomain_list; 
 
-		$fdata = '';
-		if ($a == 'httpd-light')  {
-			$iplist = os_get_allips();
-			foreach($iplist as $key => $ip){
-				if ($ip) {
-					$fdata .= "NameVirtualHost {$ip}:80\n";
-					$fdata .= "NameVirtualHost {$ip}:443\n\n";
-				}
-			}
+	$fdata = '';
+	$fdata .= "<IfDefine light>\n";
+	$iplist = os_get_allips();
+	foreach($iplist as $key => $ip){
+		if ($ip) {
+			$fdata .= "\tNameVirtualHost {$ip}:80\n";
+			$fdata .= "\tNameVirtualHost {$ip}:443\n\n";
 		}
-		else {
-			$fdata = "NameVirtualHost 127.0.0.1:8080\n";
-			$fdata .= "NameVirtualHost 127.0.0.1:4443\n";
-		}
-		lfile_put_contents($init_file, $fdata);
 	}
-
+	$fdata .= "</IfDefine>\n";
+	$fdata .= "<IfDefine !light>\n";
+	$fdata .= "\tNameVirtualHost 127.0.0.1:8080\n";
+	$fdata .= "\tNameVirtualHost 127.0.0.1:4443\n";
+	$fdata .= "</IfDefine>\n";
+	lfile_put_contents($init_file, $fdata);
 	/*Think about stats later
 	$virtual_file = "/home/apache/conf/defaults/stats.conf";
 
@@ -139,36 +147,34 @@ function updateMainConfFile()
 	global $gbl, $sgbl, $login, $ghtml;
 	
 	//Create the configuration for virtual hosts on httpd-light
-	foreach(array('httpd','httpd-light') as $a) {
-		$str_createincludeconf = "echo \"Include /home/apache/conf/{$a}/exclusive/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/defaults/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/domains/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/redirects/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/webmails/*.conf\n";
-		$str_createincludeconf .= "Include /home/apache/conf/{$a}/wildcards/*.conf\"> /etc/httpd-light/conf.d/includes.conf";
+	$str_createincludeconf = "echo \"Include /home/apache/conf/exclusive/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/defaults/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/domains/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/redirects/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/webmails/*.conf\n";
+	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/conf.d/includes.conf";
 	
-		system($str_createincludeconf);
+	system($str_createincludeconf);
 
-		$init_file = "/home/apache/conf/{$a}/defaults/init.conf";
+	$init_file = "/home/apache/conf/defaults/init.conf";
 
-		//$vdomlist = $this->main->__var_vdomain_list; 
+	//$vdomlist = $this->main->__var_vdomain_list; 
 
-		$fdata = '';
-		if ($a == 'httpd-light')  {
-			$iplist = os_get_allips();
-			foreach($iplist as $key => $ip){
-				if ($ip) {
-					$fdata .= "NameVirtualHost {$ip}:80\n";
-					$fdata .= "NameVirtualHost {$ip}:443\n\n";
-				}
-			}
+	$fdata = '';
+	$fdata .= "<IfDefine light>\n";
+	$iplist = os_get_allips();
+	foreach($iplist as $key => $ip){
+		if ($ip) {
+			$fdata .= "\tNameVirtualHost {$ip}:80\n";
+			$fdata .= "\tNameVirtualHost {$ip}:443\n\n";
 		}
-		else {
-			$fdata = "NameVirtualHost 127.0.0.1:8080\n";
-			$fdata .= "NameVirtualHost 127.0.0.1:4443\n";
-		}
-		lfile_put_contents($init_file, $fdata);
 	}
+	$fdata .= "</IfDefine>\n";
+	$fdata .= "<IfDefine !light>\n";
+	$fdata .= "\tNameVirtualHost 127.0.0.1:8080\n";
+	$fdata .= "\tNameVirtualHost 127.0.0.1:4443\n";
+	$fdata .= "</IfDefine>\n";
+	lfile_put_contents($init_file, $fdata);
 
 	/*Think about stats later
 	$virtual_file = "/home/apache/conf/defaults/stats.conf";
@@ -418,8 +424,7 @@ function createConffile()
 	$err_log = "{$log_path}/{$this->main->nname}-error_log";
 
 	//Configure virtual hosts for httpd and httpd-light
-	foreach (array('httpd','httpd-light') as $a) {
-		$v_file = "/home/apache/conf/{$a}/wildcards/{$domainname}.conf";
+		$v_file = "/home/apache/conf/wildcards/{$domainname}.conf";
 		$string = "### No * (wildcards) for '{$domainname}' ###\n\n\n";
 		lfile_put_contents($v_file, $string);
 		$wcline = "\tServerAlias \\\n\t\t*.{$domainname}\n\n";
@@ -432,21 +437,21 @@ function createConffile()
 		}
 
 		for ($c = 0 ; $c < $count ; $c++) {
-			$string = null;
+			$string = '';
 			$dirp = $this->main->__var_dirprotect;
 			$this->clearDomainIpAddress();
-			$string  = null;
-			if ($a == 'httpd-light') {
-				$string .= "<VirtualHost \\\n";
-				$string .= $this->createVirtualHostiplist("80");
-				if (!$this->getServerIp()) {
-					$string .= $this->createVirtualHostiplist("443");
-				}
-				$string .= "\t\t>\n\n";
+			$string .= "<IfDefine light>\n";
+			$string .= "<VirtualHost \\\n";
+			$string .= $this->createVirtualHostiplist("80");
+			if (!$this->getServerIp()) {
+				$string .= $this->createVirtualHostiplist("443");
 			}
-			else {
-				$string .= "<VirtualHost _default_:8080>\n";
-			}
+			$string .= "\t\t>\n\n";
+			$string .= "</IfDefine>\n"
+			$string .= "<IfDefine !light>\n"
+			$string .= "<VirtualHost _default_:8080>\n";
+			$string .= "</IfDefine>\n"
+
 			$syncto = $this->syncToPort("80", $cust_log, $err_log);
 			if ($c === 1){
 				$syncto = str_replace(" {$domainname}", " wildcards.{$domainname}", $syncto);
@@ -459,30 +464,30 @@ function createConffile()
 			$string .= str_replace($token, $line, $syncto);
 			$string .= $this->middlepart($web_home, $domainname, $dirp); 
 			$string .= $this->AddOpenBaseDir();
-			if ($a == 'httpd-light') {
-				$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
-				$string .= "RewriteEngine on\n";
-				$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-				$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-			}
+			$string .= "<IfDefine light>\n";
+			$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
+			$string .= "RewriteEngine on\n";
+			$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
+			$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+			$string .= "</IfDefine>\n"
 			$string .= $this->endtag();
 			lxfile_mkdir($this->main->getFullDocRoot());
 			$exclusiveip = false;
 			//add call getSSL() later
 	
 			if ($c === 1) {
-				$v_file = "/home/apache/conf/{$a}/wildcards/{$domainname}.conf";
+				$v_file = "/home/apache/conf/wildcards/{$domainname}.conf";
 				lfile_put_contents($v_file, $string);
 			}
 			else {
 				if ($exclusiveip) {
-					$v_file = "/home/apache/conf/{$a}/exclusive/{$domainname}.conf";
-					$v2_file = "/home/apache/conf/{$a}/domains/{$domainname}.conf";
+					$v_file = "/home/apache/conf/exclusive/{$domainname}.conf";
+					$v2_file = "/home/apache/conf/domains/{$domainname}.conf";
 					lfile_put_contents($v2_file, "### Have exclusive ip for '{$domainname}' ###\n\n\n");
 				}
 				else {
-					$v_file = "/home/apache/conf/{$a}/domains/{$domainname}.conf";
-					$v2_file = "/home/apache/conf/{$a}/exclusive/{$domainname}.conf";
+					$v_file = "/home/apache/conf/domains/{$domainname}.conf";
+					$v2_file = "/home/apache/conf/exclusive/{$domainname}.conf";
 					lfile_put_contents($v2_file, "### No exclusive ip for '{$domainname}' ###\n\n\n");
 				}
 				$mmaillist = $this->main->__var_mmaillist;
@@ -507,9 +512,7 @@ function createConffile()
 				$this->setAddon();		
 			}
 		}
-	}
 	//reload webservers
-	
 }
 
 function getSSL()
