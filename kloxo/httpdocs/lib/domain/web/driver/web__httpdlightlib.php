@@ -20,11 +20,9 @@ static function installMe()
 	
 	//Remove any previous httpd
 	system("rm -rf /etc/httpd");
-	system("rm -rf /etc/httpd-light");
 	system("rm -rf /home/httpd/conf");
 	system("rm -rf /home/apache/conf");
 	system("rm -f /etc/init.d/httpd");
-	system("rm -f /etc/init.d/httpd-light");
 	system("rm -f /etc/sysconfig/httpd");
 
 	//Install the httpd
@@ -34,6 +32,8 @@ static function installMe()
 	
 	//Create custom configuration to provide a light front end
 	//that is a reverse proxy for providing php.
+	//All of these files will be templates that will not be overwritten
+	//so the admin will have more control over the config.
 	#Create httpd-light
 		#Create init.d script
 		system("cp /etc/init.d/httpd /etc/init.d/httpd-light");
@@ -48,9 +48,6 @@ static function installMe()
 		system("sed -i 's,PidFile run/httpd.pid,#PidFile run/httpd.pid,g' /etc/httpd/conf/httpd.conf");
 		#invalidate the worker config in httpd.conf
 		system("sed -i 's/<IfModule worker.c>/<IfModule worker-old.c>/g' /etc/httpd-light/conf/httpd.conf");
-		#Create new file /etc/httpd-light/conf.d/reverseproxy.conf
-		system("echo LoadModule proxy_module modules/mod_proxy.so> /etc/httpd-light/conf.d/reverseproxy.conf");
-		system("echo ProxyPreserveHost on>> /etc/httpd-light/conf.d/reverseproxy.conf");
 		#Configure php not to load for httpd-light
 		system("sed -i 's,LoadModule php5_module modules/libphp5.so,<IfDefine light>\nLoadModule php5_module modules/libphp5.so\n</IfDefine>\n,g' /etc/httpd/conf.d/php.conf");
 		#Configure httpd-light for worker mpm
@@ -67,13 +64,15 @@ static function installMe()
 		$str_createworkerconf .= "</IfModule>\"> /etc/httpd/conf.d/worker.conf";
 		system($str_createworkerconf);
 		
-		#Configure PidFile
+		#Configure PidFile and reverse proxy
 		$str_createlightconf = "echo \"<IfDefine light>\n";
 		$str_createlightconf .= "\tPidFile run/httpd-light.pid\n";
+		$str_createlightconf .= "\tLoadModule proxy_module modules/mod_proxy.so\n";
+		$str_createlightconf .= "\tProxyPreserveHost on\n";
 		$str_createlightconf .= "</IfDefine>\n";
 		$str_createlightconf .= "<IfDefine !light>\n";
 		$str_createlightconf .= "\tPidFile run/httpd.pid\n";
-		$str_createlightconf .= "</IfDefine>\n";
+		$str_createlightconf .= "</IfDefine>\n"> /etc/httpd/conf.d/light.conf;
 		system($str_createlightconf);
 		
 	#invalidate the prefork config in the main httpd.conf file for httpd
