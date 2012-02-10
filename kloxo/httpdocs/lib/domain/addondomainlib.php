@@ -176,7 +176,10 @@ static function createListSlist($parent)
 
 	$web = $parent->getObject('web');
 	// have trouble when use addondomain, so use full_update
-	$web->setUpdateSubaction('full_update');
+	#$web->setUpdateSubaction('full_update');
+	//#863  This changes from a fullupdate to just running addon again.
+	//Did not want to remove it altogether as  the comment above was to fix some previous problem.
+	$web->setUpdateSubaction('addondomain');
 
 	// original code...
 

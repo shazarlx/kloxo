@@ -932,7 +932,6 @@ function getSuexecString($username)
 
 static function staticgetSuexecString($username, $nname = null)
 {
-	$username = ($username) ? $username : 'apache'; //Temp fix for issue 863]
 	global $gbl, $sgbl, $login, $ghtml;
 
 	// issue #567 -- change '$this->main->username' to '$username' for consistence
@@ -1092,6 +1091,7 @@ function syncToPort($port, $cust_log, $err_log)
 
 	$string .= "\t".$this->getAwstatsString();
 
+	//Fix for Issue #863
 	$string .= "\t".$this->getSuexecString(($this->main->username) ? $this->main->username : $this->main->nname);
 
 	foreach((array) $this->main->redirect_a as $red) {
