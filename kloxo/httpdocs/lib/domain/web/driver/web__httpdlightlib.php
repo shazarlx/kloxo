@@ -72,7 +72,7 @@ static function installMe()
 		$str_createlightconf .= "</IfDefine>\n";
 		$str_createlightconf .= "<IfDefine !light>\n";
 		$str_createlightconf .= "\tPidFile run/httpd.pid\n";
-		$str_createlightconf .= "</IfDefine>\n"> /etc/httpd/conf.d/light.conf;
+		$str_createlightconf .= "</IfDefine>\n"\> /etc/httpd/conf.d/light.conf";
 		system($str_createlightconf);
 		
 	#invalidate the prefork config in the main httpd.conf file for httpd
@@ -446,10 +446,10 @@ function createConffile()
 				$string .= $this->createVirtualHostiplist("443");
 			}
 			$string .= "\t\t>\n\n";
-			$string .= "</IfDefine>\n"
-			$string .= "<IfDefine !light>\n"
+			$string .= "</IfDefine>\n";
+			$string .= "<IfDefine !light>\n";
 			$string .= "<VirtualHost _default_:8080>\n";
-			$string .= "</IfDefine>\n"
+			$string .= "</IfDefine>\n";
 
 			$syncto = $this->syncToPort("80", $cust_log, $err_log);
 			if ($c === 1){
@@ -468,7 +468,7 @@ function createConffile()
 			$string .= "RewriteEngine on\n";
 			$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
 			$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-			$string .= "</IfDefine>\n"
+			$string .= "</IfDefine>\n";
 			$string .= $this->endtag();
 			lxfile_mkdir($this->main->getFullDocRoot());
 			$exclusiveip = false;
