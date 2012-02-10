@@ -1092,7 +1092,7 @@ function syncToPort($port, $cust_log, $err_log)
 
 	$string .= "\t".$this->getAwstatsString();
 
-	$string .= "\t".$this->getSuexecString($this->main->username);
+	$string .= "\t".$this->getSuexecString(($this->main->username) ? $this->main->username : $this->main->nname);
 
 	foreach((array) $this->main->redirect_a as $red) {
 		$rednname = remove_extra_slash("/{$red->nname}");
