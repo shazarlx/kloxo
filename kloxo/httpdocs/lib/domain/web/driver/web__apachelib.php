@@ -274,7 +274,9 @@ function enablePhp()
 	global $gbl, $sgbl, $login, $ghtml;
 
 	$domname = $this->main->nname;
-	$uname = $this->main->username;
+	//$uname = $this->main->username;
+	//Issue #863
+	$uname = ($this->main->username) ? $this->main->username : $domname;
 
 	if (!$this->main->priv->isOn('php_flag'))  {
 		return  "AddType application/x-httpd-php-source .php\n";
