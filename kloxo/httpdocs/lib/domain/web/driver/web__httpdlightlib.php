@@ -144,8 +144,8 @@ static function installMe()
 
 	system('chkconfig httpd on');
 	system('chkconfig httpd-light on');
-	system('service httpd restart');
-	system('service httpd-light restart');
+	system('service httpd start');
+	system('service httpd-light start');
 }
 
 function updateMainConfFile()
@@ -519,6 +519,9 @@ function createConffile()
 			}
 		}
 	//reload webservers
+	system('service httpd reload');
+	system('service httpd-light reload');
+	
 }
 
 function getSSL()
