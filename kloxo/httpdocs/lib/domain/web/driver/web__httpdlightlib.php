@@ -46,8 +46,10 @@ static function installMe()
 		system("sed -i '/INITLOG_ARGS=/ a\\\nOPTIONS=\"-Dlight\"' /etc/init.d/httpd-light");
 		#Don't use PidFile from httpd.conf
 		system("sed -i 's,PidFile run/httpd.pid,#PidFile run/httpd.pid,g' /etc/httpd/conf/httpd.conf");
+		#Don't use Listen from httpd.conf
+		system("sed -i 's/Listen 80/#Listen 80/g' /etc/httpd/conf/httpd.conf");
 		#invalidate the worker config in httpd.conf
-		system("sed -i 's/<IfModule worker.c>/<IfModule worker-old.c>/g' /etc/httpd-light/conf/httpd.conf");
+		system("sed -i 's/<IfModule worker.c>/<IfModule worker-old.c>/g' /etc/httpd/conf/httpd.conf");
 		#Configure php not to load for httpd-light
 		system("sed -i 's,LoadModule php5_module modules/libphp5.so,<IfDefine light>\nLoadModule php5_module modules/libphp5.so\n</IfDefine>\n,g' /etc/httpd/conf.d/php.conf");
 		#Configure httpd-light for worker mpm
@@ -66,17 +68,22 @@ static function installMe()
 		
 		#Configure PidFile and reverse proxy
 		$str_createlightconf = "echo \"<IfDefine light>\n";
+		$str_createlightconf .= "\tListen 80\n";
 		$str_createlightconf .= "\tPidFile run/httpd-light.pid\n";
 		$str_createlightconf .= "\tLoadModule proxy_module modules/mod_proxy.so\n";
 		$str_createlightconf .= "\tProxyPreserveHost on\n";
 		$str_createlightconf .= "</IfDefine>\n";
 		$str_createlightconf .= "<IfDefine !light>\n";
+		$str_createlightconf .= "\tListen 127.0.0.1:8080\n";
 		$str_createlightconf .= "\tPidFile run/httpd.pid\n";
-		$str_createlightconf .= "</IfDefine>\n"\> /etc/httpd/conf.d/light.conf";
+		$str_createlightconf .= "\tLoadModule php5_module modules/libphp5.so\n";
+		$str_createlightconf .= "\tAddHandler php5-script .php\n";
+		$str_createlightconf .= "\tAddType text/html .php\n";
+		$str_createlightconf .= "</IfDefine>\n\"> /etc/httpd/conf.d/light.conf";
 		system($str_createlightconf);
 		
 	#invalidate the prefork config in the main httpd.conf file for httpd
-	system("sed -i 's/<IfModule prefork.c>/<IfModule prefork-old.c>/g' /etc/httpd-light/conf/httpd.conf");
+	system("sed -i 's/<IfModule prefork.c>/<IfModule prefork-old.c>/g' /etc/httpd/conf/httpd.conf");
 	#Configure prefork for a server with 512 MB of memory
 	$str_createpreforkconf = "echo \"<IfModule prefork.c>\n";
 	$str_createpreforkconf .= "\tStartServers         5\n";
@@ -103,7 +110,7 @@ static function installMe()
 	$str_createincludeconf .= "Include /home/apache/conf/domains/*.conf\n";
 	$str_createincludeconf .= "Include /home/apache/conf/redirects/*.conf\n";
 	$str_createincludeconf .= "Include /home/apache/conf/webmails/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/conf.d/includes.conf";
+	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/httpd/conf.d/includes.conf";
 	
 	system($str_createincludeconf);
 
@@ -137,8 +144,8 @@ static function installMe()
 
 	system('chkconfig httpd on');
 	system('chkconfig httpd-light on');
-	system('service httpd start');
-	system('service httpd-light start');
+	system('service httpd restart');
+	system('service httpd-light restart');
 }
 
 function updateMainConfFile()
@@ -439,17 +446,17 @@ function createConffile()
 			$string = '';
 			$dirp = $this->main->__var_dirprotect;
 			$this->clearDomainIpAddress();
-			$string .= "<IfDefine light>\n";
+			//$string .= "<IfDefine light>\n";
 			$string .= "<VirtualHost \\\n";
 			$string .= $this->createVirtualHostiplist("80");
 			if (!$this->getServerIp()) {
 				$string .= $this->createVirtualHostiplist("443");
 			}
-			$string .= "\t\t>\n\n";
-			$string .= "</IfDefine>\n";
-			$string .= "<IfDefine !light>\n";
-			$string .= "<VirtualHost _default_:8080>\n";
-			$string .= "</IfDefine>\n";
+			$string .= "\t\t 127.0.0.1:8080 127.0.0.1:4443>\n\n";
+			//$string .= "</IfDefine>\n";
+			//$string .= "<IfDefine !light>\n";
+			//$string .= "<VirtualHost 127.0.0.1:8080>\n";
+			//$string .= "</IfDefine>\n";
 
 			$syncto = $this->syncToPort("80", $cust_log, $err_log);
 			if ($c === 1){
