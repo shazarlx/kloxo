@@ -30,71 +30,14 @@ static function installMe()
 		throw new lxexception('install_httpd_failed', 'parent');
 	}
 	
-	//Create custom configuration to provide a light front end
-	//that is a reverse proxy for providing php.
-	//All of these files will be templates that will not be overwritten
-	//so the admin will have more control over the config.
-	#Create httpd-light
-		#Create init.d script
-		system("cp /etc/init.d/httpd /etc/init.d/httpd-light");
-		system("sed -i 's/httpd        Startup/httpd-light  Startup/g' /etc/init.d/httpd-light");
-		system("sed -i 's/processname: httpd/processname: httpd-light/g' /etc/init.d/httpd-light");
-		system("sed -i 's,/etc/sysconfig/httpd,/etc/sysconfig/httpd-light,g' /etc/init.d/httpd-light");
-		system("sed -i 's,/var/run/httpd.pid,/var/run/httpd-light.pid,g' /etc/init.d/httpd-light");
-		system("sed -i 's,prog=httpd,prog=httpd-light,g' /etc/init.d/httpd-light");
-		system("sed -i 's,/var/lock/subsys/httpd,/var/lock/subsys/httpd-light,g' /etc/init.d/httpd-light");
-		system("sed -i '/INITLOG_ARGS=/ a\\\nOPTIONS=\"-Dlight\"' /etc/init.d/httpd-light");
-		#Don't use PidFile from httpd.conf
-		system("sed -i 's,PidFile run/httpd.pid,#PidFile run/httpd.pid,g' /etc/httpd/conf/httpd.conf");
-		#Don't use Listen from httpd.conf
-		system("sed -i 's/Listen 80/#Listen 80/g' /etc/httpd/conf/httpd.conf");
-		#invalidate the worker config in httpd.conf
-		system("sed -i 's/<IfModule worker.c>/<IfModule worker-old.c>/g' /etc/httpd/conf/httpd.conf");
-		#Configure php not to load for httpd-light
-		system("sed -i 's,LoadModule php5_module modules/libphp5.so,<IfDefine light>\nLoadModule php5_module modules/libphp5.so\n</IfDefine>\n,g' /etc/httpd/conf.d/php.conf");
-		#Configure httpd-light for worker mpm
-		system("sed 's,#HTTPD=/usr/sbin/httpd.worker,HTTPD=/usr/sbin/httpd.worker,g' /etc/sysconfig/httpd > /etc/sysconfig/httpd-light");
-		#customize worker config for a server with 512 MB of memory
-		$str_createworkerconf = "echo \"<IfModule worker.c>\n";
-		$str_createworkerconf .= "\tThreadLimit       1024\n";
-		$str_createworkerconf .= "\tStartServers         2\n";
-		$str_createworkerconf .= "\tMaxClients        2048\n";
-		$str_createworkerconf .= "\tMinSpareThreads     25\n";
-		$str_createworkerconf .= "\tMaxSpareThreads     75\n";
-		$str_createworkerconf .= "\tThreadsPerChild   1024\n";
-		$str_createworkerconf .= "\tMaxRequestsPerChild  0\n";
-		$str_createworkerconf .= "</IfModule>\"> /etc/httpd/conf.d/worker.conf";
-		system($str_createworkerconf);
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_init.d_httpd-light', '/etc/init.d/httpd-light');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf_httpd.conf', '/etc/httpd/conf/httpd.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_sysconfig_httpd-light', '/etc/sysconfig/httpd-light');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_worker.conf', '/etc/httpd/conf.d/worker.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_light.conf', '/etc/httpd/conf.d/light.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_prefork.conf', '/etc/httpd/conf.d/prefork.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_includes.conf', '/etc/httpd/conf.d/includes.conf');
 		
-		#Configure PidFile and reverse proxy
-		$str_createlightconf = "echo \"<IfDefine light>\n";
-		$str_createlightconf .= "\tListen 80\n";
-		$str_createlightconf .= "\tPidFile run/httpd-light.pid\n";
-		$str_createlightconf .= "\tLoadModule proxy_module modules/mod_proxy.so\n";
-		$str_createlightconf .= "\tProxyPreserveHost on\n";
-		$str_createlightconf .= "</IfDefine>\n";
-		$str_createlightconf .= "<IfDefine !light>\n";
-		$str_createlightconf .= "\tListen 127.0.0.1:8080\n";
-		$str_createlightconf .= "\tPidFile run/httpd.pid\n";
-		$str_createlightconf .= "\tLoadModule php5_module modules/libphp5.so\n";
-		$str_createlightconf .= "\tAddHandler php5-script .php\n";
-		$str_createlightconf .= "\tAddType text/html .php\n";
-		$str_createlightconf .= "</IfDefine>\n\"> /etc/httpd/conf.d/light.conf";
-		system($str_createlightconf);
-		
-	#invalidate the prefork config in the main httpd.conf file for httpd
-	system("sed -i 's/<IfModule prefork.c>/<IfModule prefork-old.c>/g' /etc/httpd/conf/httpd.conf");
-	#Configure prefork for a server with 512 MB of memory
-	$str_createpreforkconf = "echo \"<IfModule prefork.c>\n";
-	$str_createpreforkconf .= "\tStartServers         5\n";
-	$str_createpreforkconf .= "\tMinSpareServers      5\n";
-	$str_createpreforkconf .= "\tMaxSpareServers     10\n";
-	$str_createpreforkconf .= "\tServerLimit         10\n";
-	$str_createpreforkconf .= "\tMaxClients          10\n";
-	$str_createpreforkconf .= "\tMaxRequestsPerChild 4000\n";
-	$str_createpreforkconf .= "</IfModule>\"> /etc/httpd/conf.d/prefork.conf";
-	system($str_createpreforkconf);
-	
 	//Create directory structure for virtual hosts
 	lxfile_mkdir('/home/apache/conf');
 	lxfile_mkdir("/home/apache/conf/defaults");
@@ -104,35 +47,17 @@ static function installMe()
 	lxfile_mkdir("/home/apache/conf/wildcards");
 	lxfile_mkdir("/home/apache/conf/exclusive");
 
-	//Create the configuration for virtual hosts on httpd-light
-	$str_createincludeconf = "echo \"Include /home/apache/conf/exclusive/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/defaults/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/domains/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/redirects/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/webmails/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/httpd/conf.d/includes.conf";
-	
-	system($str_createincludeconf);
-
-	$init_file = "/home/apache/conf/defaults/init.conf";
-
 	//$vdomlist = $this->main->__var_vdomain_list; 
-
-	$fdata = '';
-	$fdata .= "<IfDefine light>\n";
-	$iplist = os_get_allips();
-	foreach($iplist as $key => $ip){
+	$namevhoststring = '';
+	foreach(os_get_allips() as $key => $ip){
 		if ($ip) {
-			$fdata .= "\tNameVirtualHost {$ip}:80\n";
-			$fdata .= "\tNameVirtualHost {$ip}:443\n\n";
+			$namevhoststring .= "\tNameVirtualHost {$ip}:80\n";
+			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n\n";
 		}
 	}
-	$fdata .= "</IfDefine>\n";
-	$fdata .= "<IfDefine !light>\n";
-	$fdata .= "\tNameVirtualHost 127.0.0.1:8080\n";
-	$fdata .= "\tNameVirtualHost 127.0.0.1:4443\n";
-	$fdata .= "</IfDefine>\n";
-	lfile_put_contents($init_file, $fdata);
+	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
+	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhosthoststring, $initconftemplate));
+
 	/*Think about stats later
 	$virtual_file = "/home/apache/conf/defaults/stats.conf";
 
@@ -152,44 +77,17 @@ function updateMainConfFile()
 {
 	global $gbl, $sgbl, $login, $ghtml;
 	
-	//Create the configuration for virtual hosts on httpd-light
-	$str_createincludeconf = "echo \"Include /home/apache/conf/exclusive/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/defaults/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/domains/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/redirects/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/webmails/*.conf\n";
-	$str_createincludeconf .= "Include /home/apache/conf/wildcards/*.conf\"> /etc/conf.d/includes.conf";
-	
-	system($str_createincludeconf);
-
-	$init_file = "/home/apache/conf/defaults/init.conf";
-
 	//$vdomlist = $this->main->__var_vdomain_list; 
 
-	$fdata = '';
-	$fdata .= "<IfDefine light>\n";
-	$iplist = os_get_allips();
-	foreach($iplist as $key => $ip){
+	$namevhoststring = '';
+	foreach(os_get_allips() as $key => $ip){
 		if ($ip) {
-			$fdata .= "\tNameVirtualHost {$ip}:80\n";
-			$fdata .= "\tNameVirtualHost {$ip}:443\n\n";
+			$namevhoststring .= "\tNameVirtualHost {$ip}:80\n";
+			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n\n";
 		}
 	}
-	$fdata .= "</IfDefine>\n";
-	$fdata .= "<IfDefine !light>\n";
-	$fdata .= "\tNameVirtualHost 127.0.0.1:8080\n";
-	$fdata .= "\tNameVirtualHost 127.0.0.1:4443\n";
-	$fdata .= "</IfDefine>\n";
-	lfile_put_contents($init_file, $fdata);
-
-	/*Think about stats later
-	$virtual_file = "/home/apache/conf/defaults/stats.conf";
-
-	$fdata = "Alias /awstatscss \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/css/\"\n";
-	$fdata .= "Alias /awstatsicons \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/icon/\"\n\n";
-
-	lfile_put_contents($virtual_file, $fdata);
-	*/
+	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
+	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhosthoststring, $initconftemplate));
 }
 
 function getServerIp()
@@ -389,9 +287,6 @@ function delDomain()
 	if (!$this->main->nname) {
 		return;
 	}
-
-	// MR -- don't need updateMainConfFile() for new structure but directly delete domain config file
-//	$this->updateMainConfFile();
 
 	$plist = array('domains', 'redirects', 'wildcards', 'exclusive');
 	$bpath = "/home/apache/conf";
@@ -1254,7 +1149,6 @@ function addDomain()
 
 	$this->main->createDir();
 	$this->createConffile();
-//	$this->updateMainConfFile();
 
 	$this->main->createPhpInfo();
 
@@ -1407,10 +1301,6 @@ function fullUpdate()
 	self::createSSlConf($this->main->__var_ipssllist, $this->main->__var_domainipaddress);
 
 	$this->createConffile();
-//	$this->updateMainConfFile();
-
-//	self::createWebDefaultConfig();
-
 	lxfile_unix_chown_rec("{$droot}/", "{$uname}:{$uname}");
 	lxfile_unix_chmod("{$droot}/", "0755");
 	lxfile_unix_chmod("{$droot}", "0755");
