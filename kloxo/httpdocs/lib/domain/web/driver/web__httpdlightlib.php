@@ -56,7 +56,7 @@ static function installMe()
 		}
 	}
 	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
-	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhosthoststring, $initconftemplate));
+	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
 
 	/*Think about stats later
 	$virtual_file = "/home/apache/conf/defaults/stats.conf";
@@ -1340,7 +1340,7 @@ function dbactionUpdate($subaction)
 
 		case "create_config":
 		case "addondomain":
-			$this->createConffile();
+			//$this->createConffile();
 			break;
 
 		case "add_delete_dirprotect":
