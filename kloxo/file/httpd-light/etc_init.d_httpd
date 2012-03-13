@@ -1,14 +1,14 @@
 #!/bin/bash
 #
-# httpd-light  Startup script for the Apache HTTP Server
+# httpd        Startup script for the Apache HTTP Server
 #
 # chkconfig: - 85 15
 # description: The Apache HTTP Server is an efficient and extensible  \
 #	       server implementing the current HTTP standards.
-# processname: httpd-light
+# processname: httpd
 # config: /etc/httpd/conf/httpd.conf
-# config: /etc/sysconfig/httpd-light
-# pidfile: /var/run/httpd-light.pid
+# config: /etc/sysconfig/httpd
+# pidfile: /var/run/httpd.pid
 #
 ### BEGIN INIT INFO
 # Provides: httpd
@@ -23,28 +23,27 @@
 # Source function library.
 . /etc/rc.d/init.d/functions
 
-if [ -f /etc/sysconfig/httpd-light ]; then
-        . /etc/sysconfig/httpd-light
-fi
-
 # Start httpd in the C locale by default.
 HTTPD_LANG=${HTTPD_LANG-"C"}
 
 # This will prevent initlog from swallowing up a pass-phrase prompt if
 # mod_ssl needs a pass-phrase from the user.
 INITLOG_ARGS=""
-OPTIONS="-Dlight"
 
-# Set HTTPD=/usr/sbin/httpd.worker in /etc/sysconfig/httpd-light to use a server
+# Set HTTPD=/usr/sbin/httpd.worker in /etc/sysconfig/httpd to use a server
 # with the thread-based "worker" MPM; BE WARNED that some modules may not
 # work correctly with a thread-based MPM; notably PHP will refuse to start.
 
 # Path to the apachectl script, server binary, and short-form for messages.
 apachectl=/usr/sbin/apachectl
-httpd=${HTTPD-/usr/sbin/httpd}
-prog=httpd-light
-pidfile=${PIDFILE-/var/run/httpd-light.pid}
-lockfile=${LOCKFILE-/var/lock/subsys/httpd-light}
+httpd=/usr/sbin/httpd.worker
+httpd-light=/usr/sbin/httpd.itk
+#prog=httpd
+pidfile=/var/run/httpd.pid
+pidfile-light=/var/run/httpd-light.pid
+lockfile=${LOCKFILE-/var/lock/subsys/httpd}
+lockfile=/var/lock/subsys/httpd
+lockfile=/var/lock/subsys/httpd-light
 RETVAL=0
 
 # The semantics of these two functions differ from the way apachectl does
@@ -52,32 +51,56 @@ RETVAL=0
 # when not running is also a failure.  So we just do it the way init scripts
 # are expected to behave here.
 start() {
-        echo -n $"Starting $prog: "
-        LANG=$HTTPD_LANG daemon --pidfile=${pidfile} $httpd $OPTIONS
+        echo -n $"Starting $httpd: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfile} $httpd
         RETVAL=$?
         echo
         [ $RETVAL = 0 ] && touch ${lockfile}
+		
+		echo -n $"Starting $httpd-light: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfile-light} $httpd-light -Dlight
+        RETVAL-light=$?
+        echo
+        [ $RETVAL-light = 0 ] && touch ${lockfile-light}
         return $RETVAL
+		#TODO add a better return for both httpd and httpd-light
 }
 
 # When stopping httpd a delay of >10 second is required before SIGKILLing the
 # httpd parent; this gives enough time for the httpd parent to SIGKILL any
 # errant children.
 stop() {
-	echo -n $"Stopping $prog: "
+	echo -n $"Stopping $httpd: "
 	killproc -p ${pidfile} -d 10 $httpd
 	RETVAL=$?
 	echo
 	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+	
+	echo -n $"Stopping $httpd-light: "
+	killproc -p ${pidfile-light} -d 10 $httpd-light
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f ${lockfile-light} ${pidfile-light}
 }
 reload() {
-    echo -n $"Reloading $prog: "
+    echo -n $"Reloading $httpd: "
     if ! LANG=$HTTPD_LANG $httpd $OPTIONS -t >&/dev/null; then
         RETVAL=$?
         echo $"not reloading due to configuration syntax error"
         failure $"not reloading $httpd due to configuration syntax error"
     else
         killproc -p ${pidfile} $httpd -HUP
+        RETVAL=$?
+    fi
+    echo
+	
+	echo -n $"Reloading $httpd-light: "
+    if ! LANG=$HTTPD_LANG $httpd-light $OPTIONS -t >&/dev/null; then
+        RETVAL=$?
+        echo $"not reloading due to configuration syntax error"
+        failure $"not reloading $httpd due to configuration syntax error"
+    else
+        killproc -p ${pidfile-light} $httpd-light -HUP
         RETVAL=$?
     fi
     echo
@@ -93,6 +116,7 @@ case "$1" in
 	;;
   status)
         status $httpd
+		status $httpd-light
 	RETVAL=$?
 	;;
   restart)
@@ -101,6 +125,11 @@ case "$1" in
 	;;
   condrestart)
 	if [ -f ${pidfile} ] ; then
+		stop
+		start
+	fi
+	
+	if [ -f ${pidfile-light} ] ; then
 		stop
 		start
 	fi

@@ -30,9 +30,7 @@ static function installMe()
 		throw new lxexception('install_httpd_failed', 'parent');
 	}
 	
-	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_init.d_httpd-light', '/etc/init.d/httpd-light');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf_httpd.conf', '/etc/httpd/conf/httpd.conf');
-	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_sysconfig_httpd-light', '/etc/sysconfig/httpd-light');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_worker.conf', '/etc/httpd/conf.d/worker.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_light.conf', '/etc/httpd/conf.d/light.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_prefork.conf', '/etc/httpd/conf.d/prefork.conf');
@@ -68,9 +66,7 @@ static function installMe()
 	*/
 
 	system('chkconfig httpd on');
-	system('chkconfig httpd-light on');
 	system('service httpd start');
-	system('service httpd-light start');
 }
 
 function updateMainConfFile()
