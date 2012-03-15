@@ -1409,8 +1409,8 @@ function dbactionUpdate($subaction)
 			break;
 
 		case "static_config_update":
-			self::createCpConfig();
-			self::createWebDefaultConfig();
+			//self::createCpConfig();
+			//self::createWebDefaultConfig();
 			$this->updateMainConfFile();
 			break;
 	}

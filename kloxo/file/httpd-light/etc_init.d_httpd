@@ -36,14 +36,12 @@ INITLOG_ARGS=""
 
 # Path to the apachectl script, server binary, and short-form for messages.
 apachectl=/usr/sbin/apachectl
-httpd=/usr/sbin/httpd.worker
-httpd-light=/usr/sbin/httpd.itk
-#prog=httpd
+httpd=/usr/sbin/httpd.itk
+httpdlight=/usr/sbin/httpd.worker
 pidfile=/var/run/httpd.pid
-pidfile-light=/var/run/httpd-light.pid
-lockfile=${LOCKFILE-/var/lock/subsys/httpd}
+pidfilelight=/var/run/httpdlight.pid
 lockfile=/var/lock/subsys/httpd
-lockfile=/var/lock/subsys/httpd-light
+lockfilelight=/var/lock/subsys/httpdlight
 RETVAL=0
 
 # The semantics of these two functions differ from the way apachectl does
@@ -57,11 +55,11 @@ start() {
         echo
         [ $RETVAL = 0 ] && touch ${lockfile}
 		
-		echo -n $"Starting $httpd-light: "
-        LANG=$HTTPD_LANG daemon --pidfile=${pidfile-light} $httpd-light -Dlight
-        RETVAL-light=$?
+		echo -n $"Starting $httpdlight: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfilelight} $httpdlight -Dlight
+        RETVALlight=$?
         echo
-        [ $RETVAL-light = 0 ] && touch ${lockfile-light}
+        [ $RETVALlight = 0 ] && touch ${lockfilelight}
         return $RETVAL
 		#TODO add a better return for both httpd and httpd-light
 }
@@ -76,11 +74,11 @@ stop() {
 	echo
 	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
 	
-	echo -n $"Stopping $httpd-light: "
-	killproc -p ${pidfile-light} -d 10 $httpd-light
+	echo -n $"Stopping $httpdlight: "
+	killproc -p ${pidfilelight} -d 10 $httpdlight
 	RETVAL=$?
 	echo
-	[ $RETVAL = 0 ] && rm -f ${lockfile-light} ${pidfile-light}
+	[ $RETVAL = 0 ] && rm -f ${lockfilelight} ${pidfilelight}
 }
 reload() {
     echo -n $"Reloading $httpd: "
@@ -94,13 +92,13 @@ reload() {
     fi
     echo
 	
-	echo -n $"Reloading $httpd-light: "
-    if ! LANG=$HTTPD_LANG $httpd-light $OPTIONS -t >&/dev/null; then
+	echo -n $"Reloading $httpdlight: "
+    if ! LANG=$HTTPD_LANG $httpdlight $OPTIONS -t >&/dev/null; then
         RETVAL=$?
         echo $"not reloading due to configuration syntax error"
         failure $"not reloading $httpd due to configuration syntax error"
     else
-        killproc -p ${pidfile-light} $httpd-light -HUP
+        killproc -p ${pidfilelight} $httpdlight -HUP
         RETVAL=$?
     fi
     echo
@@ -116,7 +114,7 @@ case "$1" in
 	;;
   status)
         status $httpd
-		status $httpd-light
+		status $httpdlight
 	RETVAL=$?
 	;;
   restart)
@@ -129,7 +127,7 @@ case "$1" in
 		start
 	fi
 	
-	if [ -f ${pidfile-light} ] ; then
+	if [ -f ${pidfilelight} ] ; then
 		stop
 		start
 	fi
