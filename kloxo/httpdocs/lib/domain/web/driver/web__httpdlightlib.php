@@ -35,6 +35,7 @@ static function installMe()
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_light.conf', '/etc/httpd/conf.d/light.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_prefork.conf', '/etc/httpd/conf.d/prefork.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_includes.conf', '/etc/httpd/conf.d/includes.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_init.d_httpd', '/etc/init.d/httpd');
 		
 	//Create directory structure for virtual hosts
 	lxfile_mkdir('/home/apache/conf');
