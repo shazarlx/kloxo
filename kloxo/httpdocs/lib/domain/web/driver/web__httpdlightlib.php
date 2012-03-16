@@ -33,7 +33,7 @@ static function installMe()
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf_httpd.conf', '/etc/httpd/conf/httpd.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_worker.conf', '/etc/httpd/conf.d/worker.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_light.conf', '/etc/httpd/conf.d/light.conf');
-	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_prefork.conf', '/etc/httpd/conf.d/prefork.conf');
+	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_itk.conf', '/etc/httpd/conf.d/itk.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_includes.conf', '/etc/httpd/conf.d/includes.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_init.d_httpd', '/etc/init.d/httpd');
 		
