@@ -82,7 +82,7 @@ stop() {
 }
 reload() {
     echo -n $"Reloading $httpd: "
-    if ! LANG=$HTTPD_LANG $httpd $OPTIONS -t >&/dev/null; then
+    if ! LANG=$HTTPD_LANG $httpd -t >&/dev/null; then
         RETVAL=$?
         echo $"not reloading due to configuration syntax error"
         failure $"not reloading $httpd due to configuration syntax error"
@@ -93,7 +93,7 @@ reload() {
     echo
 	
 	echo -n $"Reloading $httpdlight: "
-    if ! LANG=$HTTPD_LANG $httpdlight $OPTIONS -t >&/dev/null; then
+    if ! LANG=$HTTPD_LANG $httpdlight -Dlight -t >&/dev/null; then
         RETVAL=$?
         echo $"not reloading due to configuration syntax error"
         failure $"not reloading $httpd due to configuration syntax error"

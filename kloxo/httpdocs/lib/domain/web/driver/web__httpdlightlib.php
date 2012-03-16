@@ -2,11 +2,8 @@
 
 class web__apache extends lxDriverClass {
 
-
 static function uninstallMe()
 {
-	global $gbl, $sgbl, $login, $ghtml;
-
 	lxshell_return("service", "httpd", "stop");
 	lxshell_return("rpm", "-e", "--nodeps", "httpd");
 	if (file_exists("/etc/init.d/httpd")) {
@@ -16,8 +13,6 @@ static function uninstallMe()
 
 static function installMe()
 {
-	global $gbl, $sgbl, $login, $ghtml;
-	
 	//Remove any previous httpd
 	system("rm -rf /etc/httpd");
 	system("rm -rf /home/httpd/conf");
@@ -46,45 +41,33 @@ static function installMe()
 	lxfile_mkdir("/home/apache/conf/wildcards");
 	lxfile_mkdir("/home/apache/conf/exclusive");
 
-	//$vdomlist = $this->main->__var_vdomain_list; 
-	$namevhoststring = '';
-	foreach(os_get_allips() as $key => $ip){
-		if ($ip) {
-			$namevhoststring .= "\tNameVirtualHost {$ip}:80\n";
-			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n\n";
-		}
-	}
-	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
-	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
-
-	/*Think about stats later
-	$virtual_file = "/home/apache/conf/defaults/stats.conf";
-
-	$fdata = "Alias /awstatscss \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/css/\"\n";
-	$fdata .= "Alias /awstatsicons \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/icon/\"\n\n";
-
-	lfile_put_contents($virtual_file, $fdata);
-	*/
-
 	system('chkconfig httpd on');
 	system('service httpd start');
 }
 
 function updateMainConfFile()
 {
-	global $gbl, $sgbl, $login, $ghtml;
+	global $sgbl;
 	
-	//$vdomlist = $this->main->__var_vdomain_list; 
-
 	$namevhoststring = '';
+	
 	foreach(os_get_allips() as $key => $ip){
 		if ($ip) {
-			$namevhoststring .= "\tNameVirtualHost {$ip}:80\n";
-			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n\n";
+			$namevhoststring .= "NameVirtualHost {$ip}:80\n";
+			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n";
 		}
 	}
+	
 	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
-	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhosthoststring, $initconftemplate));
+	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
+	
+	//TODO do all of the default config files here instead of in dbactionUpdate static_config_update
+	$statsconffile = "/home/apache/conf/defaults/stats.conf";
+
+	$statsconfstring = "Alias /awstatscss \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/css/\"\n";
+	$statsconfstring .= "Alias /awstatsicons \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/icon/\"\n\n";
+
+	lfile_put_contents($statsconffile, $statsconfstring);
 }
 
 function getServerIp()
@@ -1410,8 +1393,7 @@ function dbactionUpdate($subaction)
 			break;
 
 		case "static_config_update":
-			//self::createCpConfig();
-			//self::createWebDefaultConfig();
+			self::createWebDefaultConfig();
 			$this->updateMainConfFile();
 			break;
 	}
