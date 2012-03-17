@@ -61,13 +61,11 @@ function updateMainConfFile()
 	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
 	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
 	
-	//TODO do all of the default config files here instead of in dbactionUpdate static_config_update
-	$statsconffile = "/home/apache/conf/defaults/stats.conf";
-
-	$statsconfstring = "Alias /awstatscss \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/css/\"\n";
-	$statsconfstring .= "Alias /awstatsicons \"{$sgbl->__path_home_root}/httpd/awstats/wwwroot/icon/\"\n\n";
-
-	lfile_put_contents($statsconffile, $statsconfstring);
+	$vhostipstring .= self::staticcreateVirtualHostiplist("80");
+	if (!$this->getServerIp()) {
+		$vhostipstring .= self::staticcreateVirtualHostiplist("443");
+	}
+	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--VHOSTIPTOKEN1--', $vhostipstring, $initconftemplate));
 }
 
 function getServerIp()
@@ -563,10 +561,10 @@ static function getCreateWebmail($list, $isdisabled = null)
 
 		$prog = (!isset($l['webmailprog']) || ($l['webmailprog'] === '--system-default--')) ? "" : $l['webmailprog'];
 
-		if ((!$prog) && ($rlflag !== 'remote') && (!$isdisabled)) {
-			$string .= "### 'webmail.{$l['nname']}' handled by ../webmails/webmail.conf ###\n\n\n";
-			continue;
-		}
+//		if ((!$prog) && ($rlflag !== 'remote') && (!$isdisabled)) {
+//			$string .= "### 'webmail.{$l['nname']}' handled by ../webmails/webmail.conf ###\n\n\n";
+//			continue;
+//		}
 
 		$string .= "<VirtualHost \\\n{$vstring}";
 		$string .= "\t\t>\n\n";
@@ -588,10 +586,17 @@ static function getCreateWebmail($list, $isdisabled = null)
 				}
 			}
 
-			$string .= "\t<IfModule mod_suphp.c>\n";
-			$string .= "\t\tSuPhp_UserGroup lxlabs lxlabs\n";
+			$string .= "\t<IfModule itk.c>\n";
+			$string .= "\t\tAssignUserId lxlabs lxlabs\n";
 			$string .= "\t</IfModule>\n";
 		}
+		
+		$string .= "<IfDefine light>\n";
+		$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
+		$string .= "RewriteEngine on\n";
+		$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
+		$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+		$string .= "</IfDefine>\n";
 
 		$string .= "\n</VirtualHost>\n\n\n";
 	}
@@ -1393,7 +1398,7 @@ function dbactionUpdate($subaction)
 			break;
 
 		case "static_config_update":
-			self::createWebDefaultConfig();
+			//self::createWebDefaultConfig();
 			$this->updateMainConfFile();
 			break;
 	}
