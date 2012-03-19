@@ -54,18 +54,20 @@ function updateMainConfFile()
 	foreach(os_get_allips() as $key => $ip){
 		if ($ip) {
 			$namevhoststring .= "NameVirtualHost {$ip}:80\n";
-			$namevhoststring .= "\tNameVirtualHost {$ip}:443\n";
+			$namevhoststring .= "NameVirtualHost {$ip}:443\n";
 		}
 	}
 	
 	$initconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults_init.conf');
-	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
+	$initconffilename = '/home/apache/conf/defaults/init.conf';
+	lfile_put_contents($initconffilename, str_replace('--TOKEN1--', $namevhoststring, $initconftemplate));
 	
 	$vhostipstring .= self::staticcreateVirtualHostiplist("80");
 	if (!$this->getServerIp()) {
 		$vhostipstring .= self::staticcreateVirtualHostiplist("443");
 	}
-	lfile_put_contents('/home/apache/conf/defaults/init.conf', str_replace('--VHOSTIPTOKEN1--', $vhostipstring, $initconftemplate));
+	$initconffile = lxfile_getfile($initconffilename);
+	lfile_put_contents($initconffilename, str_replace('--VHOSTIPTOKEN1--', $vhostipstring, $initconffile));
 }
 
 function getServerIp()
@@ -352,7 +354,52 @@ function createConffile()
 			$string .= $this->endtag();
 			lxfile_mkdir($this->main->getFullDocRoot());
 			$exclusiveip = false;
-			//add call getSSL() later
+
+			if($this->main->priv->isOn('ssl_flag') && $this->getServerIp()) {
+
+				$iplist = $this->getSslIpList();
+				foreach($iplist as $ip) {
+					$string .= "\n#### ssl virtualhost per ip {$ip} start\n";
+					$ssl_cert = $this->sslsysnc($ip);
+					if (!$ssl_cert) { continue; }
+					$string .= "<VirtualHost \\\n";
+					$string .= "\t$ip:443\\\n";
+					$string .= "\t\t>\n\n";
+
+					$syncto = $this->syncToPort("443", $cust_log, $err_log);
+
+					if ($c === 1){
+						$syncto = str_replace(" {$domainname}", " wildcards.{$domainname}", $syncto);
+						$line  = $wcline;
+					}
+					else {
+						$line = $this->createServerAliasLine();
+					}
+
+					$token = "###serveralias###";
+
+					$string .= str_replace($token, $line, $syncto);
+
+					$string .= $this->sslsysnc($ip);
+
+					$string .= $this->middlepart($web_home, $domainname, $dirp); 
+
+					$string .= $this->AddOpenBaseDir();
+
+					$string .= $this->endtag();
+					$string .= "#### ssl virtualhost per ip {$ip} end\n";
+				}
+
+				$exclusiveip = true;
+
+				// --- for better appear
+				$string = str_replace("\t", "||||", $string);
+				$string = str_replace("\n", "\n\t", $string);
+				$string = str_replace("||||", "\t", $string);
+
+				$string2 = "\n\n<IfModule mod_ssl.c>\n{$string}\n</IfModule>\n\n\n";
+			}
+
 	
 			if ($c === 1) {
 				$v_file = "/home/apache/conf/wildcards/{$domainname}.conf";
@@ -561,12 +608,12 @@ static function getCreateWebmail($list, $isdisabled = null)
 
 		$prog = (!isset($l['webmailprog']) || ($l['webmailprog'] === '--system-default--')) ? "" : $l['webmailprog'];
 
-//		if ((!$prog) && ($rlflag !== 'remote') && (!$isdisabled)) {
-//			$string .= "### 'webmail.{$l['nname']}' handled by ../webmails/webmail.conf ###\n\n\n";
-//			continue;
-//		}
+		//if ((!$prog) && ($rlflag !== 'remote') && (!$isdisabled)) {
+		//	$string .= "### 'webmail.{$l['nname']}' handled by ../webmails/webmail.conf ###\n\n\n";
+		//	continue;
+		//}
 
-		$string .= "<VirtualHost \\\n{$vstring}";
+		$string .= "<VirtualHost \\\n{$vstring}	127.0.0.1:8080 127.0.0.1:4443";
 		$string .= "\t\t>\n\n";
 		$string .= "\tServerName webmail.{$l['nname']}\n\n";
 
@@ -1398,7 +1445,7 @@ function dbactionUpdate($subaction)
 			break;
 
 		case "static_config_update":
-			//self::createWebDefaultConfig();
+			//self::createWebmailConfig();
 			$this->updateMainConfFile();
 			break;
 	}
