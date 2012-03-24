@@ -1,0 +1,147 @@
+#!/bin/bash
+#
+# httpd        Startup script for the Apache HTTP Server
+#
+# chkconfig: - 85 15
+# description: The Apache HTTP Server is an efficient and extensible  \
+#	       server implementing the current HTTP standards.
+# processname: httpd
+# config: /etc/httpd/conf/httpd.conf
+# config: /etc/sysconfig/httpd
+# pidfile: /var/run/httpd.pid
+#
+### BEGIN INIT INFO
+# Provides: httpd
+# Required-Start: $local_fs $remote_fs $network $named
+# Required-Stop: $local_fs $remote_fs $network
+# Should-Start: distcache
+# Short-Description: start and stop Apache HTTP Server
+# Description: The Apache HTTP Server is an extensible server 
+#  implementing the current HTTP standards.
+### END INIT INFO
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Start httpd in the C locale by default.
+HTTPD_LANG=${HTTPD_LANG-"C"}
+
+# This will prevent initlog from swallowing up a pass-phrase prompt if
+# mod_ssl needs a pass-phrase from the user.
+INITLOG_ARGS=""
+
+# Set HTTPD=/usr/sbin/httpd.worker in /etc/sysconfig/httpd to use a server
+# with the thread-based "worker" MPM; BE WARNED that some modules may not
+# work correctly with a thread-based MPM; notably PHP will refuse to start.
+
+# Path to the apachectl script, server binary, and short-form for messages.
+apachectl=/usr/sbin/apachectl
+httpd=/usr/sbin/httpd.itk
+httpdlight=/usr/sbin/httpd.worker
+pidfile=/var/run/httpd.pid
+pidfilelight=/var/run/httpdlight.pid
+lockfile=/var/lock/subsys/httpd
+lockfilelight=/var/lock/subsys/httpdlight
+RETVAL=0
+
+# The semantics of these two functions differ from the way apachectl does
+# things -- attempting to start while running is a failure, and shutdown
+# when not running is also a failure.  So we just do it the way init scripts
+# are expected to behave here.
+start() {
+        echo -n $"Starting $httpd: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfile} $httpd
+        RETVAL=$?
+        echo
+        [ $RETVAL = 0 ] && touch ${lockfile}
+		
+		echo -n $"Starting $httpdlight: "
+        LANG=$HTTPD_LANG daemon --pidfile=${pidfilelight} $httpdlight -Dlight
+        RETVALlight=$?
+        echo
+        [ $RETVALlight = 0 ] && touch ${lockfilelight}
+        return $RETVAL
+		#TODO add a better return for both httpd and httpd-light
+}
+
+# When stopping httpd a delay of >10 second is required before SIGKILLing the
+# httpd parent; this gives enough time for the httpd parent to SIGKILL any
+# errant children.
+stop() {
+	echo -n $"Stopping $httpd: "
+	killproc -p ${pidfile} -d 10 $httpd
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f ${lockfile} ${pidfile}
+	
+	echo -n $"Stopping $httpdlight: "
+	killproc -p ${pidfilelight} -d 10 $httpdlight
+	RETVAL=$?
+	echo
+	[ $RETVAL = 0 ] && rm -f ${lockfilelight} ${pidfilelight}
+}
+reload() {
+    echo -n $"Reloading $httpd: "
+    if ! LANG=$HTTPD_LANG $httpd -t >&/dev/null; then
+        RETVAL=$?
+        echo $"not reloading due to configuration syntax error"
+        failure $"not reloading $httpd due to configuration syntax error"
+    else
+        killproc -p ${pidfile} $httpd -HUP
+        RETVAL=$?
+    fi
+    echo
+	
+	echo -n $"Reloading $httpdlight: "
+    if ! LANG=$HTTPD_LANG $httpdlight -Dlight -t >&/dev/null; then
+        RETVAL=$?
+        echo $"not reloading due to configuration syntax error"
+        failure $"not reloading $httpd due to configuration syntax error"
+    else
+        killproc -p ${pidfilelight} $httpdlight -HUP
+        RETVAL=$?
+    fi
+    echo
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+        status $httpd
+		status $httpdlight
+	RETVAL=$?
+	;;
+  restart)
+	stop
+	start
+	;;
+  condrestart)
+	if [ -f ${pidfile} ] ; then
+		stop
+		start
+	fi
+	
+	if [ -f ${pidfilelight} ] ; then
+		stop
+		start
+	fi
+	;;
+  force-reload|reload)
+        reload
+	;;
+  graceful|help|configtest|fullstatus)
+	$apachectl $@
+	RETVAL=$?
+	;;
+  *)
+	echo $"Usage: $prog {start|stop|restart|condrestart|reload|status|fullstatus|graceful|help|configtest}"
+	RETVAL=3
+esac
+
+exit $RETVAL
