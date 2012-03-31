@@ -689,10 +689,6 @@ function syncToPort($port, $cust_log, $err_log)
 
 	$string  = null;
 
-	// issue #656 - When adding a subdomain, the Document Root field is not being validated
-	// Adding quotations so that we can work with directories with spaces
-	// MR -- also for other lines
-
 	if ($this->main->isOn('force_www_redirect')) {
 		$string .= "\tServerName www.{$domname}\n" ;
 	} else {
@@ -737,8 +733,6 @@ function syncToPort($port, $cust_log, $err_log)
 	$string .= "\tRedirect /kloxo \"https://cp.{$domname}:{$this->main->__var_sslport}\"\n";
 	$string .= "\tRedirect /kloxononssl \"http://cp.{$domname}:{$this->main->__var_nonsslport}\"\n\n";
 
-	//Taking out webmail redirect temporarily to try an Alias
-	//$string .= "\tRedirect /webmail \"http://webmail.{$domname}\"\n\n";
 	foreach($this->main->__var_mmaillist as $m) {
 		if ($m['nname'] === $domname) {
 			$webmailprog = (isset($m['webmailprog'])) ? $m['webmailprog'] : '';
@@ -749,7 +743,7 @@ function syncToPort($port, $cust_log, $err_log)
 	}
 
 	if($this->main->isOn('status')) {
-		$prog = ($webmailprog == '--system-default--' || $webmailprog == '--chooser--') ? '' : "{$webmailprog}/";
+		$prog = ($webmailprog == '' || $webmailprog == '--system-default--' || $webmailprog == '--chooser--') ? '' : "{$webmailprog}/";
 	
 		if ($remotelocalflag == 'remote') {
 			$webmail_url = add_http_if_not_exist($webmail_url);
@@ -1041,11 +1035,11 @@ function dbactionUpdate($subaction)
 	switch($subaction) {
 
 		case "full_update":
-			if (!$this->main->username) {
-				throw new lxexception('full_update_was_not_attempted_because_username_is_null', 'parent');
+			if ($this->main->username) {
+				$this->fullUpdate();
+				$this->main->doStatsPageProtection();
 			}
-			$this->fullUpdate();
-			$this->main->doStatsPageProtection();
+
 			break;
 
 		case "add_subweb_a":
