@@ -38,7 +38,6 @@ static function installMe()
 	lxfile_mkdir('/home/apache/conf');
 	lxfile_mkdir("/home/apache/conf/defaults");
 	lxfile_mkdir("/home/apache/conf/domains");
-	lxfile_mkdir("/home/apache/conf/redirects");
 
 	system('chkconfig httpd on');
 	system('service httpd start');
@@ -65,6 +64,23 @@ function updateMainConfFile()
 	$vhostipstring .= $alliplist[0] . ":80 " . $alliplist[0] . ":443";
 	$initconffile = lxfile_getfile($initconffilename);
 	lfile_put_contents($initconffilename, str_replace('--VHOSTIPTOKEN1--', $vhostipstring, $initconffile));
+	
+
+	$sslconffilename = "/home/apache/conf/defaults/__ssl.conf";
+	$ssl_cert = sslcert::getSslCertnameFromIP($this->main->__var_ipssllist[0]['nname']);
+	$ssl_root = $sgbl->__path_ssl_root;
+	$certificatef = "{$ssl_root}/{$ssl_cert}.crt";
+	$keyfile = "{$ssl_root}/{$ssl_cert}.key";
+	$cafile = "{$ssl_root}/{$ssl_cert}.ca";
+	sslcert::checkAndThrow(lfile_get_contents($certificatef), lfile_get_contents($keyfile), $ssl_cert);
+	$sslconfstring = "<Virtualhost $alliplist[0]:443>\n";
+	$sslconfstring .= "\tSSLEngine On \n";
+	$sslconfstring .= "\tSSLCertificateFile {$certificatef}\n";
+	$sslconfstring .= "\tSSLCertificateKeyFile {$keyfile}\n";
+	$sslconfstring .= "\tSSLCACertificatefile {$cafile}\n";
+	$sslconfstring .= "</Virtualhost>";
+
+	lfile_put_contents($sslconffilename, $sslconfstring);
 }
 
 function getServerIp()
@@ -239,22 +255,17 @@ function delDomain()
 {
 	global $gbl, $sgbl, $login, $ghtml;
 
-	// Very important. If the nname is null, then the 'rm -rf' command will delete all the domains.
-	// So please be carefule here. Must find a better way to delete stuff.
 	if (!$this->main->nname) {
 		return;
 	}
 
-	$plist = array('domains', 'redirects', 'wildcards', 'exclusive');
-	$bpath = "/home/apache/conf";
+	$path = "/home/apache/conf/domains";
 
 	foreach($plist as $k => $v) {
-		lxfile_rm("{$bpath}/{$v}/{$this->main->nname}.conf");
+		lxfile_rm("{$path}/{$this->main->nname}.conf");
 	}
 
 	$this->main->deleteDir();
-
-	self::createSSlConf($this->main->__var_ipssllist, $this->main->__var_domainipaddress);
 }
 
 function clearDomainIpAddress()
@@ -327,31 +338,30 @@ function createConffile()
 			$string .= "\n#### ssl virtualhost per ip {$ip} start\n";
 			$ssl_cert = $this->sslsysnc($ip);
 			if (!$ssl_cert) { continue; }
-				$string .= "<VirtualHost \\\n";
-				$string .= "\t$ip:443\\\n";
-				$string .= "\t\t>\n\n";
+			$string .= "<VirtualHost \\\n";
+			$string .= "\t$ip:443\\\n";
+			$string .= "\t\t>\n\n";
 
-				$syncto = $this->syncToPort("443", $cust_log, $err_log);
+			$syncto = $this->syncToPort("443", $cust_log, $err_log);
 
-				$line = $this->createServerAliasLine();
+			$line = $this->createServerAliasLine();
 
-				$token = "###serveralias###";
-				$string .= str_replace($token, $line, $syncto);
+			$token = "###serveralias###";
+			$string .= str_replace($token, $line, $syncto);
 
-				$string .= $this->sslsysnc($ip);
-				$string .= $this->middlepart($web_home, $domainname, $dirp); 
-				$string .= $this->AddOpenBaseDir();
+			$string .= $this->sslsysnc($ip);
+			$string .= $this->middlepart($web_home, $domainname, $dirp); 
+			$string .= $this->AddOpenBaseDir();
 					
-				$string .= "<IfDefine light>\n";
-				$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
-				$string .= "RewriteEngine on\n";
-				$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-				$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-				$string .= "</IfDefine>\n";
-
-				$string .= $this->endtag();
-				$string .= "#### ssl virtualhost per ip {$ip} end\n";
-			}
+			$string .= "<IfDefine light>\n";
+			$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
+			$string .= "RewriteEngine on\n";
+			$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
+			$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+			$string .= "</IfDefine>\n";
+			$string .= $this->endtag();
+			$string .= "#### ssl virtualhost per ip {$ip} end\n";
+		}
 
 			// --- for better appear
 			$string = str_replace("\t", "||||", $string);
@@ -359,34 +369,15 @@ function createConffile()
 			$string = str_replace("||||", "\t", $string);
 
 			$string2 = "\n\n{$string}\n\n";
-		}
+	}
 
-		$v_file = "/home/apache/conf/domains/{$domainname}.conf";
+	$v_file = "/home/apache/conf/domains/{$domainname}.conf";
 				
-		$mmaillist = $this->main->__var_mmaillist;
-		foreach($mmaillist as $m) {
-			if ($m['nname'] === $domainname) {
-				$list = $m;
-				break;
-			}
-		}
-
-		if (!isset($list)) {
-			$list = array('nname' => $domainname, 'parent_clname' => 'domain-'.$domainname, 'webmailprog' => '', 
-				'webmail_url' => '', 'remotelocalflag' => 'local');
-		}
-		if($this->main->isOn('status')) {
-			$string .= $this->getCreateWebmail(array($list));
-		}
-		else {
-			$string .= $this->getCreateWebmail(array($list), $isdisabled = true);
-		}
-		lfile_put_contents($v_file, $string);
-		$this->setAddon();		
+	$string .= $this->setAddon();
+	lfile_put_contents($v_file, $string);
+		
 	//reload webservers
 	system('service httpd reload');
-	system('service httpd-light reload');
-	
 }
 
 function getSSL()
@@ -435,34 +426,19 @@ function setAddon()
 {
 	global $gbl, $sgbl, $login, $ghtml;
 
-	$string = "";
+	$string = '';
 
-	$vaddonlist = $this->main->__var_addonlist;
-
-	foreach((array) $vaddonlist as $v) {
-		if ($v->ttype === 'redirect') {
+	foreach($this->main->__var_addonlist as $m) {
+		if ($m->ttype == 'redirect') {
 			$string .= "<VirtualHost \\\n{$this->createVirtualHostiplist("80")}";
 			$string .= "{$this->createVirtualHostiplist("443")}";
 			$string .= "\t\t>\n\n";
-			$string .= "\tServerName {$v->nname}\n";
-			$string .= "\tServerAlias \\\n\t\twww.{$v->nname}\n\n";
-			$dst = "{$this->main->nname}/{$v->destinationdir}/";
+			$string .= "\tServerName {$m->nname}\n";
+			$string .= "\tServerAlias \\\n\t\twww.{$m->nname}\n\n";
+			$dst = "{$this->main->nname}/{$m->destinationdir}/";
 			$dst = remove_extra_slash($dst);
 			$string .= "\tRedirect / \"http://{$dst}\"\n\n";
-			$string .= "</VirtualHost>\n\n\n";
-		}
-
-		$domto = str_replace("domain-","", $v->parent_clname);
-		$rlflag = ($v->mail_flag === 'on') ? 'remote' : 'local';
-
-		$list = array('nname' => $v->nname, 'parent_clname' => $v->parent_clname, 'webmailprog' => '', 
-			'webmail_url' => 'webmail.'.$domto, 'remotelocalflag' => $rlflag);
-
-		if($this->main->isOn('status')) {
-			$string .= $this->getCreateWebmail(array($list));
-		}
-		else {
-			$string .= $this->getCreateWebmail(array($list), $isdisabled = true);
+			$string .= "</VirtualHost>\n";
 		}
 	}
 
@@ -473,73 +449,7 @@ function setAddon()
 		$string .= "\tRedirect / \"http://www.{$this->main->nname}/\"\n\n";
 		$string .= "</VirtualHost>\n\n";
 	}
-
-	if ($string === '') {
-		$string = "### No domain(s) redirect to '{$this->main->nname}' ###\n\n\n";
-	}
-
-	$v_file = "/home/apache/conf/redirects/{$this->main->nname}.conf";
-
-	lfile_put_contents($v_file, $string);
-}
-
-function getCreateWebmail($list, $isdisabled = null)
-{
-	global $gbl, $sgbl, $login, $ghtml;
-
-	//$vstring = $this->createVirtualHostiplist('80');
-	//$vstring .= $this->createVirtualHostiplist('443');
 	
-	$alliplist = os_get_allips();
-	$vstring .= $alliplist[0] . ":80 " . $alliplist[0] . ":443";
-
-	foreach($list as &$l) {
-		$string = "";
-
-		$rlflag = (!isset($l['remotelocalflag'])) ? 'local' : $l['remotelocalflag'];
-
-		$prog = (!isset($l['webmailprog']) || ($l['webmailprog'] === '--system-default--')) ? "" : $l['webmailprog'];
-
-		//if ((!$prog) && ($rlflag !== 'remote') && (!$isdisabled)) {
-		//	$string .= "### 'webmail.{$l['nname']}' handled by ../webmails/webmail.conf ###\n\n\n";
-		//	continue;
-		//}
-
-		$string .= "<VirtualHost \\\n{$vstring}	127.0.0.1:8080";
-		$string .= "\t\t>\n\n";
-		$string .= "\tServerName webmail.{$l['nname']}\n\n";
-
-		if ($rlflag === 'remote') {
-			$l['webmail_url'] = add_http_if_not_exist($l['webmail_url']);
-			$string .= "\tRedirect / \"{$l['webmail_url']}\"\n";
-		} else {
-			if ($isdisabled) {
-				$string .= "\tDocumentRoot \"/home/kloxo/httpd/disable/\"\n\n";
-			} else {
-				$prog = ($l['webmailprog'] === '--chooser--') ? "" : $l['webmailprog'];
-
-				if ($prog) {
-					$string .= "\tDocumentRoot \"/home/kloxo/httpd/webmail/{$prog}/\"\n\n";
-				} else {
-					$string .= "\tDocumentRoot \"/home/kloxo/httpd/webmail/\"\n\n";
-				}
-			}
-
-			$string .= "\t<IfModule itk.c>\n";
-			$string .= "\t\tAssignUserId lxlabs lxlabs\n";
-			$string .= "\t</IfModule>\n";
-		}
-		
-		$string .= "<IfDefine light>\n";
-		$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
-		$string .= "RewriteEngine on\n";
-		$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-		$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-		$string .= "</IfDefine>\n";
-
-		$string .= "\n</VirtualHost>\n\n\n";
-	}
-
 	return $string;
 }
 
@@ -573,58 +483,6 @@ function getDav()
 	}
 
 	return $string;
-}
-
-static function createSSlConf($iplist, $domainiplist)
-{
-	global $gbl, $sgbl, $login, $ghtml; 
-
-	$string = null;
-
-	$alliplist = os_get_allips();
-
-	foreach((array) $iplist as $ip) {
-
-		if (!array_search_bool($ip['ipaddr'], $alliplist)) { continue; }
-
-		// issue related to delete 'exclusive ip/domain'
-		if (isset($domainiplist[$ip['ipaddr']])) {
-			$v = $domainiplist[$ip['ipaddr']];
-			if (($v !== '') && ($v !== '--Disabled--')) {
-				continue;
-			}
-		}
-
-		$string .= "\n\t<Virtualhost \\\n";
-		$string .= "\t\t{$ip['ipaddr']}:443\\\n";
-		$string .= "\t\t\t>\n\n";
-		$ssl_cert = sslcert::getSslCertnameFromIP($ip['nname']);
-
-		$ssl_root = $sgbl->__path_ssl_root;
-
-		$certificatef = "{$ssl_root}/{$ssl_cert}.crt";
-		$keyfile = "{$ssl_root}/{$ssl_cert}.key";
-		$cafile = "{$ssl_root}/{$ssl_cert}.ca";
-
-		sslcert::checkAndThrow(lfile_get_contents($certificatef), lfile_get_contents($keyfile), $ssl_cert);
-
-		$string .= "\t\tSSLEngine On \n";
-		$string .= "\t\tSSLCertificateFile {$certificatef}\n";
-		$string .= "\t\tSSLCertificateKeyFile {$keyfile}\n";
-		$string .= "\t\tSSLCACertificatefile {$cafile}\n\n";
-		$string .= "\t</Virtualhost>\n";
-	}
-
-	// issue #725, #760 - ssl.conf must be the first file in listing
-	// MR -- so change name from ssl.conf to __ssl.conf
-	
-	system("rm -rf /home/apache/conf/defaults/ssl.conf");
-	$sslfile = "/home/apache/conf/defaults/__ssl.conf";
-
-	//$string = "<IfModule mod_ssl.c>\n{$string}\n</IfModule>\n\n";
-	//$string .= "DirectoryIndex index.php index.htm default.htm default.html\n\n";
-
-	lfile_put_contents($sslfile, $string);
 }
 
 function sslsysnc($ipad)
@@ -879,7 +737,29 @@ function syncToPort($port, $cust_log, $err_log)
 	$string .= "\tRedirect /kloxo \"https://cp.{$domname}:{$this->main->__var_sslport}\"\n";
 	$string .= "\tRedirect /kloxononssl \"http://cp.{$domname}:{$this->main->__var_nonsslport}\"\n\n";
 
-	$string .= "\tRedirect /webmail \"http://webmail.{$domname}\"\n\n";
+	//Taking out webmail redirect temporarily to try an Alias
+	//$string .= "\tRedirect /webmail \"http://webmail.{$domname}\"\n\n";
+	foreach($this->main->__var_mmaillist as $m) {
+		if ($m['nname'] === $domname) {
+			$webmailprog = (isset($m['webmailprog'])) ? $m['webmailprog'] : '';
+			$remotelocalflag = (isset($m['remotelocalflag'])) ? $m['remotelocalflag'] : 'local';
+			$webmail_url = (isset($m['webmail_url'])) ? $m['webmail_url'] : '';
+			break;
+		}
+	}
+
+	if($this->main->isOn('status')) {
+		$prog = ($webmailprog == '--system-default--' || $webmailprog == '--chooser--') ? '' : "{$webmailprog}/";
+	
+		if ($remotelocalflag == 'remote') {
+			$webmail_url = add_http_if_not_exist($webmail_url);
+			$string .= "\tRedirect /webmail \"{$webmail_url}\"\n";
+		}
+		else {
+			$string .= "\tAlias /webmail \"/home/kloxo/httpd/webmail/{$prog}\"\n";
+		}
+	}	
+		
 	$string .= "\t<Directory \"/home/httpd/{$domname}/kloxoscript/\">\n";
 	$string .= "\t\tAllowOverride All\n";
 	$string .= "\t</Directory>\n\n";
@@ -1042,8 +922,6 @@ function addDomain()
 	$this->createConffile();
 
 	$this->main->createPhpInfo();
-
-	self::createSSlConf($this->main->__var_ipssllist, $this->main->__var_domainipaddress);
 }
 
 function hotlink_protection()
@@ -1144,8 +1022,6 @@ function fullUpdate()
 	$this->main->createPhpInfo();
 	web::createstatsConf($domname, $this->main->stats_username, $this->main->stats_password);
 
-	self::createSSlConf($this->main->__var_ipssllist, $this->main->__var_domainipaddress);
-
 	$this->createConffile();
 	lxfile_unix_chown_rec("{$droot}/", "{$uname}:{$uname}");
 	lxfile_unix_chmod("{$droot}/", "0755");
@@ -1165,6 +1041,9 @@ function dbactionUpdate($subaction)
 	switch($subaction) {
 
 		case "full_update":
+			if (!$this->main->username) {
+				throw new lxexception('full_update_was_not_attempted_because_username_is_null', 'parent');
+			}
 			$this->fullUpdate();
 			$this->main->doStatsPageProtection();
 			break;
@@ -1218,7 +1097,6 @@ function dbactionUpdate($subaction)
 		case "fixipdomain":
 			$this->createConffile();
 			$this->updateMainConfFile();
-			//self::createSSlConf($this->main->__var_ipssllist, $this->main->__var_domainipaddress);
 			break;
 
 		case "enable_php_manage_flag":
