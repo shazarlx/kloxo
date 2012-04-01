@@ -65,22 +65,14 @@ function updateMainConfFile()
 	$initconffile = lxfile_getfile($initconffilename);
 	lfile_put_contents($initconffilename, str_replace('--VHOSTIPTOKEN1--', $vhostipstring, $initconffile));
 	
-
-	$sslconffilename = "/home/apache/conf/defaults/__ssl.conf";
+	$sslconftemplate = lxfile_getfile('/usr/local/lxlabs/kloxo/file/httpd-light/home_apache_conf_defaults___ssl.conf');
+	$sslconffilename = '/home/apache/conf/defaults/__ssl.conf';
 	$ssl_cert = sslcert::getSslCertnameFromIP($this->main->__var_ipssllist[0]['nname']);
 	$ssl_root = $sgbl->__path_ssl_root;
-	$certificatef = "{$ssl_root}/{$ssl_cert}.crt";
-	$keyfile = "{$ssl_root}/{$ssl_cert}.key";
-	$cafile = "{$ssl_root}/{$ssl_cert}.ca";
-	sslcert::checkAndThrow(lfile_get_contents($certificatef), lfile_get_contents($keyfile), $ssl_cert);
-	$sslconfstring = "<Virtualhost $alliplist[0]:443>\n";
-	$sslconfstring .= "\tSSLEngine On \n";
-	$sslconfstring .= "\tSSLCertificateFile {$certificatef}\n";
-	$sslconfstring .= "\tSSLCertificateKeyFile {$keyfile}\n";
-	$sslconfstring .= "\tSSLCACertificatefile {$cafile}\n";
-	$sslconfstring .= "</Virtualhost>";
-
-	lfile_put_contents($sslconffilename, $sslconfstring);
+	sslcert::checkAndThrow(lfile_get_contents("{$ssl_root}/{$ssl_cert}.crt"), lfile_get_contents("{$ssl_root}/{$ssl_cert}.key"), $ssl_cert);
+	lfile_put_contents($sslconffilename, str_replace('--VHOSTIPTOKEN1--', $alliplist[0], $sslconftemplate));
+	$sslconffile = lxfile_getfile($sslconffilename);
+	lfile_put_contents($sslconffilename, str_replace('--SSLCERTTOKEN1--', "{$ssl_root}/{$ssl_cert}", $sslconffile));
 }
 
 function getServerIp()
@@ -378,48 +370,6 @@ function createConffile()
 		
 	//reload webservers
 	system('service httpd reload');
-}
-
-function getSSL()
-{
-	//NEEDS WORK
-	$string = '';
-	if($this->main->priv->isOn('ssl_flag')) {
-	// Do the ssl cert only if the ipaddress exists. Now when we migrate, 
-		if ($this->getServerIp()) {
-			$iplist = $this->getSslIpList();
-			foreach($iplist as $ip) {
-				$string .= "\n#### ssl virtualhost per ip {$ip} start\n";
-				$ssl_cert = $this->sslsysnc($ip);
-				if (!$ssl_cert) { continue; }
-				$string .= "<VirtualHost \\\n";
-				$string .= "\t$ip:443\\\n";
-				$string .= "\t\t>\n\n";
-				$syncto = $this->syncToPort("443", $cust_log, $err_log);
-				if ($c === 1){
-					$syncto = str_replace(" {$domainname}", " wildcards.{$domainname}", $syncto);
-					$line  = $wcline;
-				}
-				else {
-					$line = $this->createServerAliasLine();
-				}
-				$token = "###serveralias###";
-				$string .= str_replace($token, $line, $syncto);
-				$string .= $this->sslsysnc($ip);
-				$string .= $this->middlepart($web_home, $domainname, $dirp); 
-				$string .= $this->AddOpenBaseDir();
-				$string .= $this->endtag();
-				$string .= "#### ssl virtualhost per ip {$ip} end\n";
-			}
-			$exclusiveip = true;
-
-			// --- for better appear
-			$string = str_replace("\t", "||||", $string);
-			$string = str_replace("\n", "\n\t", $string);
-			$string = str_replace("||||", "\t", $string);
-			$string2 = "\n\n<IfModule mod_ssl.c>\n{$string}\n</IfModule>\n\n\n";
-		}
-	}
 }
 
 function setAddon()
