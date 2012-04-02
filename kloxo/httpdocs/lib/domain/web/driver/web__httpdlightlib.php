@@ -297,7 +297,7 @@ function createConffile()
 		foreach($iplist as $ip) {
 			$ssl_cert = $this->sslsysnc($ip);
 			if (!$ssl_cert) { continue; }
-			$string .= " {$ip}:80";
+			$string .= "{$ip}:80";
 		}
 	}
 	else {
@@ -305,7 +305,7 @@ function createConffile()
 		$string .= $alliplist[0] . ":80 " . $alliplist[0] . ":443";
 	}
 
-	$string .= " 127.0.0.1:8080 >\n\n";
+	$string .= " 127.0.0.1:8080>\n\n";
 
 	$syncto = $this->syncToPort("80", $cust_log, $err_log);
 	$line = $this->createServerAliasLine();
@@ -314,12 +314,12 @@ function createConffile()
 	$string .= str_replace($token, $line, $syncto);
 	$string .= $this->middlepart($web_home, $domainname, $dirp); 
 	$string .= $this->AddOpenBaseDir();
-	$string .= "<IfDefine light>\n";
-	$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
-	$string .= "RewriteEngine on\n";
-	$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-	$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-	$string .= "</IfDefine>\n";
+	$string .= "\t<IfDefine light>\n";
+	$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
+	$string .= "\t\tRewriteEngine on\n";
+	$string .= "\t\tRewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
+	$string .= "\t\tRewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+	$string .= "\t</IfDefine>\n";
 	$string .= $this->endtag();
 	lxfile_mkdir($this->main->getFullDocRoot());
 
@@ -330,9 +330,7 @@ function createConffile()
 			$string .= "\n#### ssl virtualhost per ip {$ip} start\n";
 			$ssl_cert = $this->sslsysnc($ip);
 			if (!$ssl_cert) { continue; }
-			$string .= "<VirtualHost \\\n";
-			$string .= "\t$ip:443\\\n";
-			$string .= "\t\t>\n\n";
+			$string .= "<VirtualHost {$ip}:443>\n\n";
 
 			$syncto = $this->syncToPort("443", $cust_log, $err_log);
 
@@ -345,22 +343,15 @@ function createConffile()
 			$string .= $this->middlepart($web_home, $domainname, $dirp); 
 			$string .= $this->AddOpenBaseDir();
 					
-			$string .= "<IfDefine light>\n";
-			$string .= "ProxyPassReverse / http://127.0.0.1:8080/\n";
-			$string .= "RewriteEngine on\n";
-			$string .= "RewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-			$string .= "RewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
-			$string .= "</IfDefine>\n";
+			$string .= "\t<IfDefine light>\n";
+			$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
+			$string .= "\t\tRewriteEngine on\n";
+			$string .= "\t\tRewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
+			$string .= "\t\tRewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+			$string .= "\t</IfDefine>\n";
 			$string .= $this->endtag();
 			$string .= "#### ssl virtualhost per ip {$ip} end\n";
 		}
-
-			// --- for better appear
-			$string = str_replace("\t", "||||", $string);
-			$string = str_replace("\n", "\n\t", $string);
-			$string = str_replace("||||", "\t", $string);
-
-			$string2 = "\n\n{$string}\n\n";
 	}
 
 	$v_file = "/home/apache/conf/domains/{$domainname}.conf";
