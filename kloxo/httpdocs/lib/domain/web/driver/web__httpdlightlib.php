@@ -33,6 +33,17 @@ static function installMe()
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_itk.conf', '/etc/httpd/conf.d/itk.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_httpd_conf.d_includes.conf', '/etc/httpd/conf.d/includes.conf');
 	lxfile_cp('/usr/local/lxlabs/kloxo/file/httpd-light/etc_init.d_httpd', '/etc/init.d/httpd');
+	
+	if (lxshell_return('yum', '-y', 'install', 'httpd-devel', '--skip-broken'))
+		throw new lxexception('install_httpd-devel_failed', 'parent');
+	if (lxshell_return('tar', '-C', '/tmp/', '-xzf', '/usr/local/lxlabs/kloxo/file/httpd-light/mod_rpaf-0.6.tar.gz'))
+		throw new lxexception('extract_mod_rpaf_failed', 'parent');
+	if (lxshell_return('apxs', '-icn', 'mod_rpaf-2.0.so', '/tmp/mod_rpaf-0.6/mod_rpaf-2.0.c'))
+		throw new lxexception('install_mod_rpaf_failed', 'parent');
+	if (lxshell_return('yum', '-y', 'install', 'pcre-devel'))
+		throw new lxexception('install_pcre-devel_failed', 'parent');
+	system("echo '' | pecl install apc");
+	//lfile_put_contents('/etc/php.d/apc.ini', 'extension=apc.so');
 		
 	//Create directory structure for virtual hosts
 	lxfile_mkdir('/home/apache/conf');
@@ -314,7 +325,12 @@ function createConffile()
 	$string .= str_replace($token, $line, $syncto);
 	$string .= $this->middlepart($web_home, $domainname, $dirp); 
 	$string .= $this->AddOpenBaseDir();
+
 	$string .= "\t<IfDefine light>\n";
+	$string .= "\t\tCacheRoot {$web_home}/{$this->main->nname}/disk_cache/\n";
+	$string .= "\t\tCacheEnable disk /\n";
+	$string .= "\t\tCacheDirLevels 5\n";
+	$string .= "\t\tCacheDirLength 3\n";
 	$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
 	$string .= "\t\tRewriteEngine on\n";
 	$string .= "\t\tRewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
@@ -322,6 +338,8 @@ function createConffile()
 	$string .= "\t</IfDefine>\n";
 	$string .= $this->endtag();
 	lxfile_mkdir($this->main->getFullDocRoot());
+	lxfile_mkdir("{$web_home}/{$this->main->nname}/disk_cache/");
+	lxfile_unix_chown("{$web_home}/{$this->main->nname}/disk_cache/", "apache:apache");
 
 	if($this->main->priv->isOn('ssl_flag') && $this->getServerIp()) {
 
