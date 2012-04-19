@@ -331,10 +331,9 @@ function createConffile()
 	$string .= "\t\tCacheEnable disk /\n";
 	$string .= "\t\tCacheDirLevels 5\n";
 	$string .= "\t\tCacheDirLength 3\n";
+	$string .= "\t\tCacheIgnoreHeaders Pragma\n";
 	$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
-	$string .= "\t\tRewriteEngine on\n";
-	$string .= "\t\tRewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-	$string .= "\t\tRewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+	$string .= "\t\tProxyPassMatch ^/(.*\\.php)$ http://127.0.0.1:8080/$1\n";
 	$string .= "\t</IfDefine>\n";
 	$string .= $this->endtag();
 	lxfile_mkdir($this->main->getFullDocRoot());
@@ -363,9 +362,7 @@ function createConffile()
 					
 			$string .= "\t<IfDefine light>\n";
 			$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
-			$string .= "\t\tRewriteEngine on\n";
-			$string .= "\t\tRewriteCond   %{REQUEST_URI} .*\\.(php)$\n";
-			$string .= "\t\tRewriteRule ^/(.*) http://127.0.0.1:8080/$1 [P]\n";
+			$string .= "\t\tProxyPassMatch ^/(.*\\.php)$ http://127.0.0.1:8080/$1\n";
 			$string .= "\t</IfDefine>\n";
 			$string .= $this->endtag();
 			$string .= "#### ssl virtualhost per ip {$ip} end\n";
