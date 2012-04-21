@@ -663,6 +663,7 @@ function syncToPort($port, $cust_log, $err_log)
 	$assignuserid = ($this->main->isOn('status')) ? $this->main->username : 'lxlabs';
 	$string .= "\n\t<IfModule itk.c>\n";
 	$string .= "\t\tAssignUserId {$assignuserid} {$assignuserid}\n";
+	$string .= "\t\tPHPINIDir {$sgbl->__path_httpd_root}/{$this->main->nname}/\n";
 	$string .= "\t</IfModule>\n\n";
 	
 	foreach((array) $this->main->redirect_a as $red) {
