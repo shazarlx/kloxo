@@ -325,6 +325,22 @@ function createConffile()
 	$string .= str_replace($token, $line, $syncto);
 	$string .= $this->middlepart($web_home, $domainname, $dirp); 
 	$string .= $this->AddOpenBaseDir();
+	
+	//Grab specific values from the domain's php.ini file to set with php_admin_value
+	$string .= "\t<IfModule mod_php5.c>\n";
+	$phpinifile = lfile_get_contents("{$web_home}/{$this->main->nname}/php.ini");
+	$phpiniarray = array_unique(explode("\n", $phpinifile));
+	$phpvaluestosearchfor = array('disable_functions','zlib.output_compression','max_execution_time','max_input_time','memory_limit','post_max_size','upload_max_filesize','session.save_path');
+	$phpadminvalues = array();
+	foreach($phpvaluestosearchfor as $searchfor)
+	{
+		$phpadminvalues = array_merge($phpadminvalues, preg_grep("/^$searchfor/", $phpiniarray));
+	}
+	$phpadminvalues[0] = "\n" . $phpadminvalues[0];
+	$phpadminvaluestr = str_replace ("\n", "\n\t\tphp_admin_value ", implode("\n",$phpadminvalues));
+	$phpadminvaluestr = str_replace ('=', '', $phpadminvaluestr);
+	$string .= $phpadminvaluestr . "\n";
+	$string .= "\t</IfModule>\n";
 
 	$string .= "\t<IfDefine light>\n";
 	$string .= "\t\tCacheRoot {$web_home}/{$this->main->nname}/disk_cache/\n";
