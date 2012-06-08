@@ -288,6 +288,11 @@ function createConffile()
 {
 	global $gbl, $sgbl, $login, $ghtml;
 	
+	//Issue #976 Can't find what calls this creatConffile incorrectly, but this keeps bad configs from being created.
+	if (!$this->main->username) {
+		return;
+	}
+	
 	$web_home = $sgbl->__path_httpd_root;
 
 	$domainname = $this->main->nname;
