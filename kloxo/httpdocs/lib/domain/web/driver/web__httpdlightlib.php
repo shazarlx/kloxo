@@ -353,6 +353,7 @@ function createConffile()
 	$string .= "\t\tCacheDirLevels 5\n";
 	$string .= "\t\tCacheDirLength 3\n";
 	$string .= "\t\tCacheIgnoreHeaders Pragma\n";
+	$string .= "\t\tProxyPreserveHost on\n";
 	$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
 	$string .= "\t\tProxyPassMatch ^/(.*\\.php.*)$ http://127.0.0.1:8080/$1\n";
 	$string .= "\t</IfDefine>\n";
@@ -382,6 +383,7 @@ function createConffile()
 			$string .= $this->AddOpenBaseDir();
 					
 			$string .= "\t<IfDefine light>\n";
+			$string .= "\t\tProxyPreserveHost on\n";
 			$string .= "\t\tProxyPassReverse / http://127.0.0.1:8080/\n";
 			$string .= "\t\tProxyPassMatch ^/(.*\\.php.*)$ http://127.0.0.1:8080/$1\n";
 			$string .= "\t</IfDefine>\n";
